@@ -21,6 +21,8 @@ from ads_mcp.coordinator import mcp
 # The `# noqa: F401` comment tells the linter to ignore the "unused import"
 # warning.
 from ads_mcp.tools import search, core  # noqa: F401
+from ads_mcp.tools import budgets, campaigns, ad_groups, ads, keywords  # noqa: F401
+from ads_mcp.tools import mutate, operations  # noqa: F401
 
 
 def run_server() -> None:

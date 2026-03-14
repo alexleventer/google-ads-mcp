@@ -25,6 +25,7 @@ from google.ads.googleads.v23.services.services.google_ads_service import (
 )
 
 from google.ads.googleads.util import get_nested_attr
+from google.api_core import protobuf_helpers
 import google.auth
 from ads_mcp.mcp_header_interceptor import MCPHeaderInterceptor
 import os
@@ -36,13 +37,13 @@ _GAQL_FILENAME = "gaql_resources.json"
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# Read-only scope for Analytics Admin API and Analytics Data API.
-_READ_ONLY_ADS_SCOPE = "https://www.googleapis.com/auth/adwords"
+# Full access scope for the Google Ads API.
+_ADS_SCOPE = "https://www.googleapis.com/auth/adwords"
 
 
 def _create_credentials() -> google.auth.credentials.Credentials:
-    """Returns Application Default Credentials with read-only scope."""
-    credentials, _ = google.auth.default(scopes=[_READ_ONLY_ADS_SCOPE])
+    """Returns Application Default Credentials with Google Ads scope."""
+    credentials, _ = google.auth.default(scopes=[_ADS_SCOPE])
     return credentials
 
 
@@ -115,3 +116,60 @@ def get_gaql_resources_filepath():
     package_root = importlib.resources.files("ads_mcp")
     file_path = package_root.joinpath(_GAQL_FILENAME)
     return file_path
+
+
+def resolve_enum(enum_class_name: str, value: str):
+    """Resolves a string to a Google Ads enum value with validation.
+
+    Args:
+        enum_class_name: The enum class name (e.g., "CampaignStatusEnum").
+        value: The string enum value (e.g., "PAUSED").
+
+    Returns:
+        The resolved enum value.
+
+    Raises:
+        ValueError: If the value is not a valid enum member.
+    """
+    client = get_googleads_client()
+    enum_class = getattr(client.enums, enum_class_name)
+    try:
+        return getattr(enum_class, value)
+    except AttributeError:
+        valid = [
+            name
+            for name in dir(enum_class)
+            if not name.startswith("_") and name.isupper()
+        ]
+        raise ValueError(
+            f"Invalid {enum_class_name} value '{value}'. "
+            f"Valid values: {', '.join(valid)}"
+        )
+
+
+def build_field_mask(modified_resource):
+    """Builds a FieldMask for a protobuf resource based on set fields."""
+    return protobuf_helpers.field_mask(None, modified_resource)
+
+
+def execute_mutate(
+    service_name: str,
+    mutate_method_name: str,
+    customer_id: str,
+    operations: list,
+) -> list[str]:
+    """Executes a Google Ads mutate call and returns resource names.
+
+    Args:
+        service_name: The Google Ads service name (e.g., "CampaignService").
+        mutate_method_name: The method on the service (e.g., "mutate_campaigns").
+        customer_id: The customer ID (digits only, no hyphens).
+        operations: List of operation protobuf objects.
+
+    Returns:
+        A list of resource_name strings from the mutation results.
+    """
+    service = get_googleads_service(service_name)
+    mutate_fn = getattr(service, mutate_method_name)
+    response = mutate_fn(customer_id=customer_id, operations=operations)
+    return [result.resource_name for result in response.results]
