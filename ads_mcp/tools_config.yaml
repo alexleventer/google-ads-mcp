@@ -7,3 +7,5 @@ namespaces:
   customers: true
   search: true
   metadata: true
+  # Tools that create, update, or remove Google Ads data. Disabled by default.
+  write: false
